@@ -1,4 +1,5 @@
 import html2canvas from 'html2canvas';
+import JSZip from 'jszip';
 import { ExportSize, ExportFormat } from '../data/exportSizes';
 
 export interface ExportResult {
@@ -13,17 +14,22 @@ export async function exportScreenshot(
   quality: number = 0.92,
   filename: string = 'screenshot'
 ): Promise<ExportResult> {
-  // Calculate scale to get high-res capture
-  const captureScale = 2;
+  // Calculate scale to match target size
+  const scaleX = size.width / element.offsetWidth;
+  const scaleY = size.height / element.offsetHeight;
+  const scale = Math.max(scaleX, scaleY);
   
   const canvas = await html2canvas(element, {
-    scale: captureScale,
+    scale: scale,
     useCORS: true,
     backgroundColor: null,
     logging: false,
     allowTaint: true,
+    width: element.offsetWidth,
+    height: element.offsetHeight,
   });
 
+  // Create target canvas with exact export dimensions
   const targetCanvas = document.createElement('canvas');
   targetCanvas.width = size.width;
   targetCanvas.height = size.height;
@@ -33,47 +39,34 @@ export async function exportScreenshot(
     throw new Error('Failed to get canvas context');
   }
 
-  // Calculate scaling to fit while maintaining aspect ratio
-  const sourceWidth = canvas.width;
-  const sourceHeight = canvas.height;
-  const targetWidth = size.width;
-  const targetHeight = size.height;
+  // Clear and fill with background
+  ctx.clearRect(0, 0, size.width, size.height);
 
-  const sourceAspect = sourceWidth / sourceHeight;
-  const targetAspect = targetWidth / targetHeight;
+  // Calculate how to draw the source to fill the target
+  const sourceAspect = canvas.width / canvas.height;
+  const targetAspect = size.width / size.height;
 
-  let drawWidth: number;
-  let drawHeight: number;
-  let offsetX: number;
-  let offsetY: number;
+  let sourceX = 0;
+  let sourceY = 0;
+  let sourceW = canvas.width;
+  let sourceH = canvas.height;
 
   if (sourceAspect > targetAspect) {
-    // Source is wider - fit to width, crop height or add padding
-    drawWidth = targetWidth;
-    drawHeight = targetWidth / sourceAspect;
-    offsetX = 0;
-    offsetY = (targetHeight - drawHeight) / 2;
-  } else {
-    // Source is taller - fit to height, crop width or add padding
-    drawHeight = targetHeight;
-    drawWidth = targetHeight * sourceAspect;
-    offsetX = (targetWidth - drawWidth) / 2;
-    offsetY = 0;
+    // Source is wider - crop sides
+    sourceW = canvas.height * targetAspect;
+    sourceX = (canvas.width - sourceW) / 2;
+  } else if (sourceAspect < targetAspect) {
+    // Source is taller - crop top/bottom
+    sourceH = canvas.width / targetAspect;
+    sourceY = (canvas.height - sourceH) / 2;
   }
 
-  // Fill background with transparent or extract from element
-  ctx.clearRect(0, 0, targetWidth, targetHeight);
-  
-  // Try to get background color from the element
-  const computedStyle = window.getComputedStyle(element);
-  const bgColor = computedStyle.backgroundColor;
-  if (bgColor && bgColor !== 'transparent' && bgColor !== 'rgba(0, 0, 0, 0)') {
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, targetWidth, targetHeight);
-  }
-
-  // Draw the captured image centered and scaled proportionally
-  ctx.drawImage(canvas, offsetX, offsetY, drawWidth, drawHeight);
+  // Draw cropped and scaled to fill target exactly
+  ctx.drawImage(
+    canvas,
+    sourceX, sourceY, sourceW, sourceH,
+    0, 0, size.width, size.height
+  );
 
   return new Promise((resolve, reject) => {
     targetCanvas.toBlob(
@@ -135,16 +128,27 @@ export async function batchExport(
 }
 
 export async function batchExportAsZip(
+  results: ExportResult[],
+  zipFilename: string = 'screenshots'
+): Promise<void> {
+  const zip = new JSZip();
+  
+  for (const result of results) {
+    zip.file(result.filename, result.blob);
+  }
+  
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  downloadBlob(zipBlob, `${zipFilename}.zip`);
+}
+
+export async function exportAllAsZip(
   elements: HTMLElement[],
   size: ExportSize,
   format: ExportFormat,
   quality: number,
-  filenamePattern: string = 'screenshot-{index}'
+  filenamePattern: string = 'screenshot-{index}',
+  zipFilename: string = 'screenshots'
 ): Promise<void> {
   const results = await batchExport(elements, size, format, quality, filenamePattern);
-  
-  for (const result of results) {
-    downloadBlob(result.blob, result.filename);
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
+  await batchExportAsZip(results, zipFilename);
 }

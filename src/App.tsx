@@ -16,7 +16,7 @@ import { ProjectControls } from './components/Toolbar/ProjectControls';
 import { ExportButton } from './components/Toolbar/ExportButton';
 import { ExportSize, ExportFormat } from './data/exportSizes';
 import { getLayoutById } from './data/layoutTemplates';
-import { exportAndDownload, downloadBlob, exportScreenshot } from './utils/exportUtils';
+import { exportAndDownload, batchExportAsZip, exportScreenshot } from './utils/exportUtils';
 
 function App() {
   const {
@@ -161,30 +161,39 @@ function App() {
   };
 
   const handleExportAll = async (size: ExportSize, format: ExportFormat, quality: number) => {
+    const results: { blob: Blob; filename: string }[] = [];
     let exportIndex = 1;
     
     for (const screenshot of screenshots) {
       const layout = getLayoutById(screenshot.layout);
       
       if (layout?.isPairedLayout) {
-        // For paired layouts, we need to render both variants
-        // This is a simplified version - in production you'd use a hidden render target
+        // For paired layouts, export both variants
         const element = cardRefs.current.get(screenshot.id);
         if (element) {
           const result = await exportScreenshot(element, size, format, quality, `screenshot-${exportIndex}`);
-          downloadBlob(result.blob, result.filename);
+          results.push(result);
           exportIndex++;
-          await new Promise(resolve => setTimeout(resolve, 300));
         }
       } else {
         const element = cardRefs.current.get(screenshot.id);
         if (element) {
           const result = await exportScreenshot(element, size, format, quality, `screenshot-${exportIndex}`);
-          downloadBlob(result.blob, result.filename);
+          results.push(result);
           exportIndex++;
-          await new Promise(resolve => setTimeout(resolve, 300));
         }
       }
+    }
+    
+    // Download as zip if multiple files, otherwise download single file
+    if (results.length > 1) {
+      await batchExportAsZip(results, `screenshots-${Date.now()}`);
+    } else if (results.length === 1) {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(results[0].blob);
+      link.download = results[0].filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
     }
   };
 
