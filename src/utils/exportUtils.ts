@@ -13,10 +13,11 @@ export async function exportScreenshot(
   quality: number = 0.92,
   filename: string = 'screenshot'
 ): Promise<ExportResult> {
-  const scale = size.width / element.offsetWidth;
+  // Calculate scale to get high-res capture
+  const captureScale = 2;
   
   const canvas = await html2canvas(element, {
-    scale: scale * 2,
+    scale: captureScale,
     useCORS: true,
     backgroundColor: null,
     logging: false,
@@ -32,7 +33,47 @@ export async function exportScreenshot(
     throw new Error('Failed to get canvas context');
   }
 
-  ctx.drawImage(canvas, 0, 0, size.width, size.height);
+  // Calculate scaling to fit while maintaining aspect ratio
+  const sourceWidth = canvas.width;
+  const sourceHeight = canvas.height;
+  const targetWidth = size.width;
+  const targetHeight = size.height;
+
+  const sourceAspect = sourceWidth / sourceHeight;
+  const targetAspect = targetWidth / targetHeight;
+
+  let drawWidth: number;
+  let drawHeight: number;
+  let offsetX: number;
+  let offsetY: number;
+
+  if (sourceAspect > targetAspect) {
+    // Source is wider - fit to width, crop height or add padding
+    drawWidth = targetWidth;
+    drawHeight = targetWidth / sourceAspect;
+    offsetX = 0;
+    offsetY = (targetHeight - drawHeight) / 2;
+  } else {
+    // Source is taller - fit to height, crop width or add padding
+    drawHeight = targetHeight;
+    drawWidth = targetHeight * sourceAspect;
+    offsetX = (targetWidth - drawWidth) / 2;
+    offsetY = 0;
+  }
+
+  // Fill background with transparent or extract from element
+  ctx.clearRect(0, 0, targetWidth, targetHeight);
+  
+  // Try to get background color from the element
+  const computedStyle = window.getComputedStyle(element);
+  const bgColor = computedStyle.backgroundColor;
+  if (bgColor && bgColor !== 'transparent' && bgColor !== 'rgba(0, 0, 0, 0)') {
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, targetWidth, targetHeight);
+  }
+
+  // Draw the captured image centered and scaled proportionally
+  ctx.drawImage(canvas, offsetX, offsetY, drawWidth, drawHeight);
 
   return new Promise((resolve, reject) => {
     targetCanvas.toBlob(
