@@ -2,11 +2,19 @@
 
 A powerful web-based tool for creating beautiful app store screenshots with device frames, layouts, and customizable elements.
 
+[![GitHub](https://img.shields.io/badge/GitHub-Repository-blue?logo=github)](https://github.com/furqanullah717/Screenshot-Maker)
+[![Live Demo](https://img.shields.io/badge/Live-Demo-green)](https://furqanullah717.github.io/Screenshot-Maker/)
+
+## Demo
+
+![Screenshot Maker Demo](./public/screenshots/demo-screenshot.png)
+
 ## Features
 
-- **Multiple Device Frames** - iPhone 15 Pro, iPhone 15, Pixel 8 Pro, Galaxy S24, iPad Pro
+- **30+ Device Frames** - iPhone 16/15/14/13 series, Samsung S24/S23, Pixel 9/8, OnePlus, Xiaomi
+- **Multi-Phone Layouts** - Side-by-side, stacked, fan, and perspective layouts with individual phone controls
+- **Phone Selection & Controls** - Click to select phones, adjust position, rotation, scale, and image per phone
 - **Layout Templates** - Classic, Modern, Minimal, Split Pair, and more
-- **Split Pair Layout** - Create two connected screenshots for app stores
 - **Feature Pills** - Add floating feature badges with icons
 - **Statistics Badges** - Display stats with laurel wreath decorations
 - **Background Customization** - Solid colors or gradient presets
@@ -58,6 +66,11 @@ This project is configured for GitHub Pages deployment. Push to the `main` branc
 - Tailwind CSS
 - Zustand (State Management)
 - html2canvas (Export)
+
+## Links
+
+- **Live Demo**: [https://furqanullah717.github.io/Screenshot-Maker/](https://furqanullah717.github.io/Screenshot-Maker/)
+- **GitHub Repository**: [https://github.com/furqanullah717/Screenshot-Maker](https://github.com/furqanullah717/Screenshot-Maker)
 
 ## License
 
