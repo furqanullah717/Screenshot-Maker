@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { BackgroundConfig, getDefaultBackground } from '../data/gradientPresets';
+import { Platform } from '../data/platforms';
 
 export interface ImageTransform {
   zoom: number;
@@ -88,6 +89,8 @@ export interface Screenshot {
 interface ScreenshotStore {
   screenshots: Screenshot[];
   selectedId: string | null;
+  platform: Platform;
+  setPlatform: (platform: Platform) => void;
   addScreenshot: () => void;
   updateScreenshot: (id: string, updates: Partial<Screenshot>) => void;
   updatePhoneConfig: (screenshotId: string, phoneIndex: number, updates: Partial<PhoneConfig>) => void;
@@ -244,6 +247,11 @@ export const useScreenshotStore = create<ScreenshotStore>()(
     (set, get) => ({
       screenshots: [],
       selectedId: null,
+      platform: 'android' as Platform,
+
+      setPlatform: (platform: Platform) => {
+        set({ platform });
+      },
 
       addScreenshot: () => {
         const newScreenshot = createDefaultScreenshot();
@@ -352,22 +360,18 @@ export const useScreenshotStore = create<ScreenshotStore>()(
     }),
     {
       name: STORAGE_KEY,
-      version: 1,
+      version: 2,
       partialize: (state) => ({
         screenshots: state.screenshots,
         selectedId: state.selectedId,
+        platform: state.platform,
       }),
-      migrate: (persistedState: unknown, version: number) => {
-        const state = persistedState as { screenshots: Screenshot[]; selectedId: string | null };
-        if (version < 1) {
-          return {
-            ...state,
-            screenshots: state.screenshots.map(migrateScreenshot),
-          };
-        }
+      migrate: (persistedState: unknown, _version: number) => {
+        const state = persistedState as { screenshots: Screenshot[]; selectedId: string | null; platform?: Platform };
         return {
           ...state,
           screenshots: state.screenshots.map(migrateScreenshot),
+          platform: state.platform || 'android',
         };
       },
     }

@@ -14,14 +14,18 @@ import { PhoneControls } from './components/Sidebar/PhoneControls';
 import { TextControls } from './components/Sidebar/TextControls';
 import { ProjectControls } from './components/Toolbar/ProjectControls';
 import { ExportButton } from './components/Toolbar/ExportButton';
+import { PlatformSelector } from './components/Toolbar/PlatformSelector';
 import { ExportSize, ExportFormat } from './data/exportSizes';
 import { getLayoutById } from './data/layoutTemplates';
+import { getPlatformConfig, getCanvasDisplaySize } from './data/platforms';
 import { exportAndDownload, batchExportAsZip, exportScreenshot } from './utils/exportUtils';
 
 function App() {
   const {
     screenshots,
     selectedId,
+    platform,
+    setPlatform,
     addScreenshot,
     updateScreenshot,
     updatePhoneConfig,
@@ -30,6 +34,9 @@ function App() {
     duplicateScreenshot,
     selectScreenshot,
   } = useScreenshotStore();
+
+  const platformConfig = getPlatformConfig(platform);
+  const canvasDisplay = getCanvasDisplaySize(platform, 700);
 
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const leftCardRef = useRef<HTMLDivElement>(null);
@@ -142,48 +149,160 @@ function App() {
   };
 
   const handleExportCurrent = async (size: ExportSize, format: ExportFormat, quality: number) => {
-    if (!selectedId) return;
+    if (!selectedId || !selectedScreenshot) return;
     
-    if (isPairedLayout) {
-      // Export both variants for paired layouts
-      if (leftCardRef.current) {
-        await exportAndDownload(leftCardRef.current, size, format, quality, `screenshot-left-${Date.now()}`);
+    // Use platform dimensions for export
+    const exportSize: ExportSize = {
+      ...size,
+      width: platformConfig.width,
+      height: platformConfig.height,
+    };
+    
+    // Create a temporary container for full-resolution rendering
+    const tempContainer = document.createElement('div');
+    tempContainer.style.cssText = `
+      position: fixed !important;
+      left: 0 !important;
+      top: 0 !important;
+      width: ${platformConfig.width}px !important;
+      height: ${platformConfig.height}px !important;
+      min-width: ${platformConfig.width}px !important;
+      min-height: ${platformConfig.height}px !important;
+      max-width: ${platformConfig.width}px !important;
+      max-height: ${platformConfig.height}px !important;
+      z-index: 99999 !important;
+      overflow: visible !important;
+      background: transparent !important;
+    `;
+    document.body.appendChild(tempContainer);
+    
+    
+    // Import ReactDOM for rendering
+    const { createRoot } = await import('react-dom/client');
+    
+    try {
+      if (isPairedLayout) {
+        // Export left variant
+        const leftRoot = createRoot(tempContainer);
+        await new Promise<void>((resolve) => {
+          leftRoot.render(
+            <ScreenshotCard
+              screenshot={selectedScreenshot}
+              width={platformConfig.width}
+              height={platformConfig.height}
+              pairedVariant="left"
+            />
+          );
+          setTimeout(resolve, 200);
+        });
+        
+        const leftElement = tempContainer.firstElementChild as HTMLElement;
+        if (leftElement) {
+          await exportAndDownload(leftElement, exportSize, format, quality, `screenshot-left-${Date.now()}`);
+        }
+        leftRoot.unmount();
+        
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Export right variant
+        const rightRoot = createRoot(tempContainer);
+        await new Promise<void>((resolve) => {
+          rightRoot.render(
+            <ScreenshotCard
+              screenshot={selectedScreenshot}
+              width={platformConfig.width}
+              height={platformConfig.height}
+              pairedVariant="right"
+            />
+          );
+          setTimeout(resolve, 200);
+        });
+        
+        const rightElement = tempContainer.firstElementChild as HTMLElement;
+        if (rightElement) {
+          await exportAndDownload(rightElement, exportSize, format, quality, `screenshot-right-${Date.now()}`);
+        }
+        rightRoot.unmount();
+      } else {
+        // Render at full resolution
+        const root = createRoot(tempContainer);
+        await new Promise<void>((resolve) => {
+          root.render(
+            <ScreenshotCard
+              screenshot={selectedScreenshot}
+              width={platformConfig.width}
+              height={platformConfig.height}
+            />
+          );
+          // Wait longer for full render at high resolution
+          setTimeout(resolve, 500);
+        });
+        
+        const element = tempContainer.firstElementChild as HTMLElement;
+        if (element) {
+          await exportAndDownload(element, exportSize, format, quality, `screenshot-${Date.now()}`);
+        }
+        root.unmount();
       }
-      await new Promise(resolve => setTimeout(resolve, 300));
-      if (rightCardRef.current) {
-        await exportAndDownload(rightCardRef.current, size, format, quality, `screenshot-right-${Date.now()}`);
-      }
-    } else {
-      const element = cardRefs.current.get(selectedId);
-      if (!element) return;
-      await exportAndDownload(element, size, format, quality, `screenshot-${Date.now()}`);
+    } finally {
+      document.body.removeChild(tempContainer);
     }
   };
 
+  const exportContainerRef = useRef<HTMLDivElement>(null);
+  const [exportingScreenshot, setExportingScreenshot] = useState<typeof screenshots[0] | null>(null);
+  const exportResolverRef = useRef<((element: HTMLDivElement) => void) | null>(null);
+
+  const waitForExportRender = (): Promise<HTMLDivElement> => {
+    return new Promise((resolve) => {
+      exportResolverRef.current = resolve;
+    });
+  };
+
+  // Effect to handle export rendering for batch export
+  useEffect(() => {
+    if (exportingScreenshot && exportContainerRef.current) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const wrapper = exportContainerRef.current?.querySelector('[data-export-card]');
+          const element = wrapper?.firstElementChild as HTMLDivElement;
+          if (element && exportResolverRef.current) {
+            exportResolverRef.current(element);
+            exportResolverRef.current = null;
+          }
+        });
+      });
+    }
+  }, [exportingScreenshot]);
+
   const handleExportAll = async (size: ExportSize, format: ExportFormat, quality: number) => {
+    // Use platform dimensions for pixel-perfect export
+    const exportSize: ExportSize = {
+      ...size,
+      width: platformConfig.width,
+      height: platformConfig.height,
+    };
+    
     const results: { blob: Blob; filename: string }[] = [];
     let exportIndex = 1;
     
     for (const screenshot of screenshots) {
-      const layout = getLayoutById(screenshot.layout);
+      // Render the screenshot in the hidden export container
+      setExportingScreenshot(screenshot);
       
-      if (layout?.isPairedLayout) {
-        // For paired layouts, export both variants
-        const element = cardRefs.current.get(screenshot.id);
-        if (element) {
-          const result = await exportScreenshot(element, size, format, quality, `screenshot-${exportIndex}`);
-          results.push(result);
-          exportIndex++;
-        }
-      } else {
-        const element = cardRefs.current.get(screenshot.id);
-        if (element) {
-          const result = await exportScreenshot(element, size, format, quality, `screenshot-${exportIndex}`);
-          results.push(result);
-          exportIndex++;
-        }
-      }
+      // Wait for the element to be rendered
+      const element = await waitForExportRender();
+      
+      // Small delay to ensure full render
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      const result = await exportScreenshot(element, exportSize, format, quality, `screenshot-${exportIndex}`);
+      results.push(result);
+      exportIndex++;
     }
+    
+    // Clear the export container
+    setExportingScreenshot(null);
     
     // Download as zip if multiple files, otherwise download single file
     if (results.length > 1) {
@@ -209,11 +328,17 @@ function App() {
           screenshotCount={screenshots.length}
         />
         
-        <div className="text-sm font-semibold text-gray-300 flex items-center gap-2">
-          <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-          Screenshot Maker
+        <div className="flex items-center gap-4">
+          <div className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+            <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+            Screenshot Maker
+          </div>
+          <PlatformSelector selected={platform} onChange={setPlatform} />
+          <span className="text-xs text-gray-500">
+            {platformConfig.width}×{platformConfig.height}
+          </span>
         </div>
         
         <ExportButton
@@ -485,8 +610,8 @@ function App() {
                       <ScreenshotCard
                         ref={leftCardRef}
                         screenshot={selectedScreenshot}
-                        width={320}
-                        height={640}
+                        width={canvasDisplay.width}
+                        height={canvasDisplay.height}
                         pairedVariant="left"
                         selectedPhoneIndex={selectedScreenshot.selectedPhoneIndex}
                         onPhoneSelect={handlePhoneSelect}
@@ -499,8 +624,8 @@ function App() {
                       <ScreenshotCard
                         ref={rightCardRef}
                         screenshot={selectedScreenshot}
-                        width={320}
-                        height={640}
+                        width={canvasDisplay.width}
+                        height={canvasDisplay.height}
                         pairedVariant="right"
                         selectedPhoneIndex={selectedScreenshot.selectedPhoneIndex}
                         onPhoneSelect={handlePhoneSelect}
@@ -513,8 +638,8 @@ function App() {
                   <ScreenshotCard
                     ref={(ref) => registerCardRef(selectedScreenshot.id, ref)}
                     screenshot={selectedScreenshot}
-                    width={400}
-                    height={800}
+                    width={canvasDisplay.width}
+                    height={canvasDisplay.height}
                     selectedPhoneIndex={selectedScreenshot.selectedPhoneIndex}
                     onPhoneSelect={handlePhoneSelect}
                   />
@@ -523,6 +648,30 @@ function App() {
             </div>
           </div>
         </main>
+      </div>
+
+      {/* Hidden Export Container - renders screenshots for batch export */}
+      <div
+        ref={exportContainerRef}
+        style={{ 
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          width: `${canvasDisplay.width}px`, 
+          height: `${canvasDisplay.height}px`,
+          transform: 'translateX(-200vw)',
+          pointerEvents: 'none',
+        }}
+      >
+        {exportingScreenshot && (
+          <div data-export-card>
+            <ScreenshotCard
+              screenshot={exportingScreenshot}
+              width={canvasDisplay.width}
+              height={canvasDisplay.height}
+            />
+          </div>
+        )}
       </div>
 
       {/* Screenshot Tabs */}

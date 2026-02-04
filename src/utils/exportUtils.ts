@@ -9,67 +9,22 @@ export interface ExportResult {
 
 export async function exportScreenshot(
   element: HTMLElement,
-  size: ExportSize,
+  _size: ExportSize,
   format: ExportFormat,
   quality: number = 0.92,
   filename: string = 'screenshot'
 ): Promise<ExportResult> {
-  // Calculate scale to match target size
-  const scaleX = size.width / element.offsetWidth;
-  const scaleY = size.height / element.offsetHeight;
-  const scale = Math.max(scaleX, scaleY);
-  
+  // Capture the element at 1:1 scale - element should already be at target resolution
   const canvas = await html2canvas(element, {
-    scale: scale,
+    scale: 1,
     useCORS: true,
     backgroundColor: null,
     logging: false,
     allowTaint: true,
-    width: element.offsetWidth,
-    height: element.offsetHeight,
   });
 
-  // Create target canvas with exact export dimensions
-  const targetCanvas = document.createElement('canvas');
-  targetCanvas.width = size.width;
-  targetCanvas.height = size.height;
-  
-  const ctx = targetCanvas.getContext('2d');
-  if (!ctx) {
-    throw new Error('Failed to get canvas context');
-  }
-
-  // Clear and fill with background
-  ctx.clearRect(0, 0, size.width, size.height);
-
-  // Calculate how to draw the source to fill the target
-  const sourceAspect = canvas.width / canvas.height;
-  const targetAspect = size.width / size.height;
-
-  let sourceX = 0;
-  let sourceY = 0;
-  let sourceW = canvas.width;
-  let sourceH = canvas.height;
-
-  if (sourceAspect > targetAspect) {
-    // Source is wider - crop sides
-    sourceW = canvas.height * targetAspect;
-    sourceX = (canvas.width - sourceW) / 2;
-  } else if (sourceAspect < targetAspect) {
-    // Source is taller - crop top/bottom
-    sourceH = canvas.width / targetAspect;
-    sourceY = (canvas.height - sourceH) / 2;
-  }
-
-  // Draw cropped and scaled to fill target exactly
-  ctx.drawImage(
-    canvas,
-    sourceX, sourceY, sourceW, sourceH,
-    0, 0, size.width, size.height
-  );
-
   return new Promise((resolve, reject) => {
-    targetCanvas.toBlob(
+    canvas.toBlob(
       (blob) => {
         if (blob) {
           const extension = format === 'jpeg' ? 'jpg' : 'png';

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ExportSize, ExportFormat, exportSizes, getExportSizesByPlatform } from '../../data/exportSizes';
+import { ExportSize, ExportFormat, exportSizes } from '../../data/exportSizes';
 
 interface ExportButtonProps {
   onExport: (size: ExportSize, format: ExportFormat, quality: number) => Promise<void>;
@@ -10,13 +10,10 @@ interface ExportButtonProps {
 
 export function ExportButton({ onExport, onExportAll, screenshotCount, disabled }: ExportButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedSize, setSelectedSize] = useState<ExportSize>(exportSizes[0]);
+  const [selectedSize] = useState<ExportSize>(exportSizes[0]);
   const [format, setFormat] = useState<ExportFormat>('png');
   const [quality, setQuality] = useState(0.92);
   const [isExporting, setIsExporting] = useState(false);
-
-  const playStoreSizes = getExportSizesByPlatform('play-store');
-  const appStoreSizes = getExportSizesByPlatform('app-store');
 
   const handleExportCurrent = async () => {
     setIsExporting(true);
@@ -78,50 +75,15 @@ export function ExportButton({ onExport, onExportAll, screenshotCount, disabled 
               <h3 className="text-sm font-semibold text-white mb-3">Export Settings</h3>
               
               <div className="space-y-4">
-                <div>
-                  <label className="text-xs text-gray-400 mb-2 block">Platform Size</label>
-                  <div className="space-y-2">
-                    <div>
-                      <span className="text-[10px] text-gray-500 uppercase tracking-wider">Play Store</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {playStoreSizes.map(size => (
-                          <button
-                            key={size.id}
-                            onClick={() => setSelectedSize(size)}
-                            className={`px-2 py-1 text-[10px] rounded transition-colors ${
-                              selectedSize.id === size.id
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                            title={`${size.width}x${size.height} - ${size.description}`}
-                          >
-                            {size.name.replace('Play Store ', '')}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-gray-500 uppercase tracking-wider">App Store</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {appStoreSizes.map(size => (
-                          <button
-                            key={size.id}
-                            onClick={() => setSelectedSize(size)}
-                            className={`px-2 py-1 text-[10px] rounded transition-colors ${
-                              selectedSize.id === size.id
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                            }`}
-                            title={`${size.width}x${size.height} - ${size.description}`}
-                          >
-                            {size.name.replace('App Store ', '')}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                <div className="bg-gray-700/50 rounded-lg p-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-300">
+                    <svg className="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span>Pixel-perfect export at canvas dimensions</span>
                   </div>
-                  <p className="text-[10px] text-gray-500 mt-2">
-                    {selectedSize.width} x {selectedSize.height}px • {selectedSize.description}
+                  <p className="text-[10px] text-gray-500 mt-1 ml-6">
+                    Size is determined by the platform selector in the toolbar
                   </p>
                 </div>
 

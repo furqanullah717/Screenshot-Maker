@@ -18,6 +18,10 @@ interface ScreenshotCardProps {
   onPhoneSelect?: (phoneIndex: number | null) => void;
 }
 
+// Base dimensions that the layout system was designed for
+const BASE_WIDTH = 400;
+const BASE_HEIGHT = 800;
+
 export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
   ({ screenshot, width = 400, height = 800, secondImage, pairedVariant, selectedPhoneIndex, onPhoneSelect }, ref) => {
     const baseLayout = getLayoutById(screenshot.layout);
@@ -29,6 +33,9 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
         </div>
       );
     }
+
+    // Calculate scale factor based on canvas size relative to base dimensions
+    const canvasScale = Math.min(width / BASE_WIDTH, height / BASE_HEIGHT);
 
     const userRotation = screenshot.phoneRotation ?? 8;
     const userScale = screenshot.phoneScale ?? 0.85;
@@ -48,8 +55,9 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
     const primaryPhoneTransform = primaryPhone?.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 };
     const secondaryPhoneTransform = secondaryPhone?.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 };
 
-    const getPrimaryPhoneScale = () => layout.phonePosition.scale * 0.8 * primaryPhoneTransform.scale;
-    const getSecondaryPhoneScale = () => (layout.secondPhonePosition?.scale ?? layout.phonePosition.scale) * 0.8 * secondaryPhoneTransform.scale;
+    // Apply canvas scale to phone scales so they size proportionally
+    const getPrimaryPhoneScale = () => layout.phonePosition.scale * 0.8 * primaryPhoneTransform.scale * canvasScale;
+    const getSecondaryPhoneScale = () => (layout.secondPhonePosition?.scale ?? layout.phonePosition.scale) * 0.8 * secondaryPhoneTransform.scale * canvasScale;
 
     const getPhoneStyle = (position: PhonePosition, phoneIndex: number): React.CSSProperties => {
       const transform = phoneIndex === 0 ? primaryPhoneTransform : secondaryPhoneTransform;
@@ -124,7 +132,7 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
       >
         <BackgroundLayer background={screenshot.background} />
         
-        <Decorations visible={layout.decorations} variant="circles" />
+        <Decorations visible={layout.decorations} variant="circles" canvasScale={canvasScale} />
         
         <TextOverlay
           title={screenshot.title}
@@ -133,6 +141,7 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
           textStyle={screenshot.textStyle}
           layout={layout}
           transform={textTransform}
+          canvasScale={canvasScale}
         />
         
         <div style={getPhoneStyle(layout.phonePosition, 0)} className="relative">
@@ -167,6 +176,7 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
             positions={layout.featurePillPositions!}
             color={screenshot.background.gradientColors?.[0] || screenshot.background.solidColor}
             offset={featurePillsOffset}
+            canvasScale={canvasScale}
           />
         )}
 
@@ -176,6 +186,7 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
             positions={layout.statPositions!}
             color={screenshot.textStyle.color}
             offset={statsOffset}
+            canvasScale={canvasScale}
           />
         )}
       </div>

@@ -8,9 +8,10 @@ interface TextOverlayProps {
   textStyle: TextStyleConfig;
   layout: LayoutTemplate;
   transform?: TextTransform;
+  canvasScale?: number;
 }
 
-export function TextOverlay({ title, subtitle, badge, textStyle, layout, transform = { x: 0, y: 0, scale: 1 } }: TextOverlayProps) {
+export function TextOverlay({ title, subtitle, badge, textStyle, layout, transform = { x: 0, y: 0, scale: 1 }, canvasScale = 1 }: TextOverlayProps) {
   const { textPosition, textAlignment } = layout;
 
   const getTextShadow = () => {
@@ -23,7 +24,7 @@ export function TextOverlay({ title, subtitle, badge, textStyle, layout, transfo
       position: 'absolute',
       zIndex: 10,
       textAlign: textAlignment,
-      padding: '2rem',
+      padding: `${2 * canvasScale}rem`,
     };
 
     switch (textPosition) {
@@ -93,7 +94,14 @@ export function TextOverlay({ title, subtitle, badge, textStyle, layout, transfo
   return (
     <div style={transformStyle}>
       {badge && (
-        <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-xs font-semibold mb-3">
+        <span 
+          className="inline-block bg-white/20 backdrop-blur-sm rounded-full font-semibold"
+          style={{
+            padding: `${0.25 * canvasScale}rem ${0.75 * canvasScale}rem`,
+            fontSize: `${12 * canvasScale}px`,
+            marginBottom: `${0.75 * canvasScale}rem`,
+          }}
+        >
           {badge}
         </span>
       )}
@@ -103,7 +111,7 @@ export function TextOverlay({ title, subtitle, badge, textStyle, layout, transfo
             className="font-bold mb-2 leading-tight"
             style={{
               fontFamily: textStyle.fontFamily,
-              fontSize: `${textStyle.titleSize}px`,
+              fontSize: `${textStyle.titleSize * canvasScale}px`,
               fontWeight: textStyle.fontWeight,
               color: textStyle.color,
               textShadow: getTextShadow(),
@@ -115,7 +123,7 @@ export function TextOverlay({ title, subtitle, badge, textStyle, layout, transfo
             className="opacity-90 leading-relaxed"
             style={{
               fontFamily: textStyle.fontFamily,
-              fontSize: `${textStyle.subtitleSize}px`,
+              fontSize: `${textStyle.subtitleSize * canvasScale}px`,
               color: textStyle.color,
             }}
           >
