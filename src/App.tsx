@@ -1,6 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
-import { useScreenshotStore } from './hooks/useScreenshots';
+import { useCallback, useRef, useState, useEffect } from 'react';
+import { useScreenshotStore, PhoneConfig } from './hooks/useScreenshots';
 import { ScreenshotCard } from './components/Canvas/ScreenshotCard';
+import { PhoneControlBar } from './components/Canvas/PhoneControlBar';
 import { DeviceSelector } from './components/Sidebar/DeviceSelector';
 import { LayoutSelector } from './components/Sidebar/LayoutSelector';
 import { ColorPicker } from './components/Sidebar/ColorPicker';
@@ -23,6 +24,8 @@ function App() {
     selectedId,
     addScreenshot,
     updateScreenshot,
+    updatePhoneConfig,
+    selectPhone,
     removeScreenshot,
     duplicateScreenshot,
     selectScreenshot,
@@ -79,6 +82,50 @@ function App() {
   const handleTextChange = (field: 'title' | 'subtitle' | 'badge', value: string) => {
     if (selectedId) {
       updateScreenshot(selectedId, { [field]: value });
+    }
+  };
+
+  const handlePhoneSelect = (phoneIndex: number | null) => {
+    if (selectedId) {
+      selectPhone(selectedId, phoneIndex);
+    }
+  };
+
+  const handlePhoneConfigUpdate = (phoneIndex: number, updates: Partial<import('./hooks/useScreenshots').PhoneConfig>) => {
+    if (selectedId) {
+      updatePhoneConfig(selectedId, phoneIndex, updates);
+    }
+  };
+
+  const handleCanvasClick = () => {
+    if (selectedId && selectedScreenshot?.selectedPhoneIndex !== null) {
+      selectPhone(selectedId, null);
+    }
+  };
+
+  // Handle Escape key to deselect phone
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedId && selectedScreenshot?.selectedPhoneIndex !== null) {
+        selectPhone(selectedId, null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedId, selectedScreenshot?.selectedPhoneIndex, selectPhone]);
+
+  // Get selected phone config for the control bar
+  const selectedPhoneConfig = selectedScreenshot?.selectedPhoneIndex !== null && selectedScreenshot?.selectedPhoneIndex !== undefined
+    ? selectedScreenshot.phoneConfigs[selectedScreenshot.selectedPhoneIndex]
+    : null;
+
+  const handleControlBarImageUpload = (file: File) => {
+    if (selectedId && selectedScreenshot?.selectedPhoneIndex !== null && selectedScreenshot?.selectedPhoneIndex !== undefined) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        updatePhoneConfig(selectedId, selectedScreenshot.selectedPhoneIndex!, { image: event.target?.result as string });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -163,11 +210,18 @@ function App() {
           <div className="p-4 space-y-6">
             {selectedScreenshot ? (
               <>
-                {/* Device Frame - at the top */}
-                <DeviceSelector
-                  selectedDevice={selectedScreenshot.deviceFrame}
-                  onChange={(deviceFrame) => updateScreenshot(selectedId!, { deviceFrame })}
-                />
+                {/* Device Frame - at the top, shows selected phone's device or global */}
+                {selectedScreenshot.selectedPhoneIndex !== null ? (
+                  <DeviceSelector
+                    selectedDevice={selectedScreenshot.phoneConfigs[selectedScreenshot.selectedPhoneIndex]?.deviceFrame || selectedScreenshot.deviceFrame}
+                    onChange={(deviceFrame) => handlePhoneConfigUpdate(selectedScreenshot.selectedPhoneIndex!, { deviceFrame })}
+                  />
+                ) : (
+                  <DeviceSelector
+                    selectedDevice={selectedScreenshot.deviceFrame}
+                    onChange={(deviceFrame) => updateScreenshot(selectedId!, { deviceFrame })}
+                  />
+                )}
 
                 {/* Layout Template */}
                 <div className="border-t border-gray-700 pt-4">
@@ -177,23 +231,73 @@ function App() {
                   />
                 </div>
 
-                {/* Screenshot Image */}
+                {/* Phone Selection Indicator */}
+                {selectedScreenshot.selectedPhoneIndex !== null && (
+                  <div className="border-t border-gray-700 pt-4">
+                    <div className="bg-blue-600/20 border border-blue-600/40 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center text-xs font-bold text-white">
+                            {selectedScreenshot.selectedPhoneIndex + 1}
+                          </div>
+                          <span className="text-sm font-medium text-blue-200">
+                            Editing Phone {selectedScreenshot.selectedPhoneIndex + 1}
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handlePhoneSelect(null)}
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                        >
+                          Deselect
+                        </button>
+                      </div>
+                      <p className="text-xs text-blue-300/70 mt-1.5">
+                        Click on the phone in the preview to edit, or use the toolbar above the phone.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Screenshot Image - shows selected phone's image controls or global */}
                 <div className="border-t border-gray-700 pt-4">
-                  <ImageControls
-                    imageTransform={selectedScreenshot.imageTransform}
-                    hasImage={!!selectedScreenshot.image}
-                    onChange={(transform) => updateScreenshot(selectedId!, { imageTransform: transform })}
-                    onImageUpload={handleImageUpload}
-                    onImageRemove={handleImageRemove}
-                  />
+                  {selectedScreenshot.selectedPhoneIndex !== null ? (
+                    <ImageControls
+                      imageTransform={selectedScreenshot.phoneConfigs[selectedScreenshot.selectedPhoneIndex]?.imageTransform || { zoom: 1, x: 0, y: 0 }}
+                      hasImage={!!selectedScreenshot.phoneConfigs[selectedScreenshot.selectedPhoneIndex]?.image}
+                      onChange={(transform) => handlePhoneConfigUpdate(selectedScreenshot.selectedPhoneIndex!, { imageTransform: transform })}
+                      onImageUpload={(file) => {
+                        const reader = new FileReader();
+                        reader.onload = (event) => {
+                          handlePhoneConfigUpdate(selectedScreenshot.selectedPhoneIndex!, { image: event.target?.result as string });
+                        };
+                        reader.readAsDataURL(file);
+                      }}
+                      onImageRemove={() => handlePhoneConfigUpdate(selectedScreenshot.selectedPhoneIndex!, { image: null })}
+                    />
+                  ) : (
+                    <ImageControls
+                      imageTransform={selectedScreenshot.imageTransform}
+                      hasImage={!!selectedScreenshot.image}
+                      onChange={(transform) => updateScreenshot(selectedId!, { imageTransform: transform })}
+                      onImageUpload={handleImageUpload}
+                      onImageRemove={handleImageRemove}
+                    />
+                  )}
                 </div>
 
-                {/* Phone Position Controls - for all layouts */}
+                {/* Phone Position Controls - shows selected phone's transform or global */}
                 <div className="border-t border-gray-700 pt-4">
-                  <PhoneControls
-                    transform={selectedScreenshot.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 }}
-                    onChange={(phoneTransform) => updateScreenshot(selectedId!, { phoneTransform })}
-                  />
+                  {selectedScreenshot.selectedPhoneIndex !== null ? (
+                    <PhoneControls
+                      transform={selectedScreenshot.phoneConfigs[selectedScreenshot.selectedPhoneIndex]?.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 }}
+                      onChange={(phoneTransform) => handlePhoneConfigUpdate(selectedScreenshot.selectedPhoneIndex!, { phoneTransform })}
+                    />
+                  ) : (
+                    <PhoneControls
+                      transform={selectedScreenshot.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 }}
+                      onChange={(phoneTransform) => updateScreenshot(selectedId!, { phoneTransform })}
+                    />
+                  )}
                 </div>
 
                 {/* Text Content */}
@@ -278,6 +382,17 @@ function App() {
 
         {/* Canvas Area - fixed with zoom */}
         <main className="flex-1 bg-gray-800 h-full flex flex-col overflow-hidden">
+          {/* Phone Control Bar - appears when a phone is selected */}
+          {selectedScreenshot && selectedPhoneConfig && selectedScreenshot.selectedPhoneIndex !== null && (
+            <PhoneControlBar
+              phoneConfig={selectedPhoneConfig}
+              phoneIndex={selectedScreenshot.selectedPhoneIndex}
+              onUpdate={(updates: Partial<PhoneConfig>) => updatePhoneConfig(selectedId!, selectedScreenshot.selectedPhoneIndex!, updates)}
+              onImageUpload={handleControlBarImageUpload}
+              onClose={() => selectPhone(selectedId!, null)}
+            />
+          )}
+
           {/* Zoom Controls */}
           {selectedScreenshot && (
             <div className="shrink-0 flex items-center justify-center gap-2 py-2 bg-gray-800 border-b border-gray-700">
@@ -320,7 +435,7 @@ function App() {
           )}
           
           {/* Preview Area */}
-          <div className="flex-1 overflow-auto p-4">
+          <div className="flex-1 overflow-auto p-4" onClick={handleCanvasClick}>
             <div 
               className="flex items-center justify-center min-h-full"
               style={{ transform: `scale(${previewZoom})`, transformOrigin: 'center top' }}
@@ -342,7 +457,7 @@ function App() {
                 </div>
               ) : isPairedLayout ? (
                 // Paired layout preview - show both variants side by side
-                <div className="flex gap-4">
+                <div className="flex gap-4" onClick={(e) => e.stopPropagation()}>
                   <div className="text-center">
                     <p className="text-xs text-gray-400 mb-2">Left Image</p>
                     <div className="shadow-2xl">
@@ -352,6 +467,8 @@ function App() {
                         width={320}
                         height={640}
                         pairedVariant="left"
+                        selectedPhoneIndex={selectedScreenshot.selectedPhoneIndex}
+                        onPhoneSelect={handlePhoneSelect}
                       />
                     </div>
                   </div>
@@ -364,17 +481,21 @@ function App() {
                         width={320}
                         height={640}
                         pairedVariant="right"
+                        selectedPhoneIndex={selectedScreenshot.selectedPhoneIndex}
+                        onPhoneSelect={handlePhoneSelect}
                       />
                     </div>
                   </div>
                 </div>
               ) : (
-                <div className="shadow-2xl">
+                <div className="shadow-2xl" onClick={(e) => e.stopPropagation()}>
                   <ScreenshotCard
                     ref={(ref) => registerCardRef(selectedScreenshot.id, ref)}
                     screenshot={selectedScreenshot}
                     width={400}
                     height={800}
+                    selectedPhoneIndex={selectedScreenshot.selectedPhoneIndex}
+                    onPhoneSelect={handlePhoneSelect}
                   />
                 </div>
               )}

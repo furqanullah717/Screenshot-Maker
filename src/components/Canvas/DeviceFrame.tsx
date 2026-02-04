@@ -7,6 +7,9 @@ interface DeviceFrameProps {
   imageTransform: ImageTransform;
   scale?: number;
   className?: string;
+  isSelected?: boolean;
+  phoneIndex?: number;
+  onClick?: (phoneIndex: number) => void;
 }
 
 interface DynamicIslandProps {
@@ -111,6 +114,9 @@ export function DeviceFrame({
   imageTransform,
   scale = 1,
   className = '',
+  isSelected = false,
+  phoneIndex = 0,
+  onClick,
 }: DeviceFrameProps) {
   const device = getDeviceById(deviceId);
 
@@ -131,14 +137,31 @@ export function DeviceFrame({
   const screenWidth = frameWidth - (device.screenInset.left + device.screenInset.right) * scale;
   const screenHeight = frameHeight - (device.screenInset.top + device.screenInset.bottom) * scale;
 
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onClick) {
+      onClick(phoneIndex);
+    }
+  };
+
   return (
     <div
-      className={`relative ${className}`}
+      className={`relative ${className} ${onClick ? 'cursor-pointer' : ''}`}
       style={{
         width: `${frameWidth}px`,
         height: `${frameHeight}px`,
       }}
+      onClick={handleClick}
     >
+      {isSelected && (
+        <div
+          className="absolute -inset-2 rounded-[inherit] pointer-events-none z-50"
+          style={{
+            borderRadius: `${(device.borderRadius + 8) * scale}px`,
+            boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.8), 0 0 20px rgba(59, 130, 246, 0.4)',
+          }}
+        />
+      )}
       {/* Device Frame (outer bezel) */}
       {!isNoFrame && (
         <div

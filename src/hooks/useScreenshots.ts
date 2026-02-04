@@ -51,6 +51,13 @@ export interface TextTransform {
   scale: number;
 }
 
+export interface PhoneConfig {
+  image: string | null;
+  imageTransform: ImageTransform;
+  phoneTransform: PhoneTransform;
+  deviceFrame: string;
+}
+
 export interface Screenshot {
   id: string;
   image: string | null;
@@ -74,6 +81,8 @@ export interface Screenshot {
   statsOffset: ElementPosition;
   phoneTransform: PhoneTransform;
   textTransform: TextTransform;
+  phoneConfigs: PhoneConfig[];
+  selectedPhoneIndex: number | null;
 }
 
 interface ScreenshotStore {
@@ -81,6 +90,8 @@ interface ScreenshotStore {
   selectedId: string | null;
   addScreenshot: () => void;
   updateScreenshot: (id: string, updates: Partial<Screenshot>) => void;
+  updatePhoneConfig: (screenshotId: string, phoneIndex: number, updates: Partial<PhoneConfig>) => void;
+  selectPhone: (screenshotId: string, phoneIndex: number | null) => void;
   removeScreenshot: (id: string) => void;
   duplicateScreenshot: (id: string) => void;
   selectScreenshot: (id: string | null) => void;
@@ -144,6 +155,23 @@ function getDefaultTextTransform(): TextTransform {
   return { x: 0, y: 0, scale: 1 };
 }
 
+export function getDefaultPhoneConfig(overrides?: Partial<PhoneConfig>): PhoneConfig {
+  return {
+    image: null,
+    imageTransform: getDefaultImageTransform(),
+    phoneTransform: getDefaultPhoneTransform(),
+    deviceFrame: 'iphone-15-pro',
+    ...overrides,
+  };
+}
+
+function getDefaultPhoneConfigs(): PhoneConfig[] {
+  return [
+    getDefaultPhoneConfig(),
+    getDefaultPhoneConfig(),
+  ];
+}
+
 export function createDefaultScreenshot(): Screenshot {
   return {
     id: generateId(),
@@ -168,10 +196,48 @@ export function createDefaultScreenshot(): Screenshot {
     statsOffset: getDefaultElementPosition(),
     phoneTransform: getDefaultPhoneTransform(),
     textTransform: getDefaultTextTransform(),
+    phoneConfigs: getDefaultPhoneConfigs(),
+    selectedPhoneIndex: null,
   };
 }
 
 const STORAGE_KEY = 'screenshot-maker-data';
+
+function migrateScreenshot(screenshot: Partial<Screenshot> & { id: string }): Screenshot {
+  const defaults = createDefaultScreenshot();
+  
+  const hasPhoneConfigs = Array.isArray(screenshot.phoneConfigs) && screenshot.phoneConfigs.length > 0;
+  
+  let phoneConfigs: PhoneConfig[];
+  if (hasPhoneConfigs) {
+    phoneConfigs = screenshot.phoneConfigs!.map(config => ({
+      ...getDefaultPhoneConfig(),
+      ...config,
+    }));
+    while (phoneConfigs.length < 2) {
+      phoneConfigs.push(getDefaultPhoneConfig());
+    }
+  } else {
+    phoneConfigs = [
+      getDefaultPhoneConfig({
+        image: screenshot.image ?? null,
+        imageTransform: screenshot.imageTransform ?? getDefaultPhoneConfig().imageTransform,
+        phoneTransform: screenshot.phoneTransform ?? getDefaultPhoneConfig().phoneTransform,
+        deviceFrame: screenshot.deviceFrame ?? 'iphone-15-pro',
+      }),
+      getDefaultPhoneConfig({
+        deviceFrame: screenshot.deviceFrame ?? 'iphone-15-pro',
+      }),
+    ];
+  }
+  
+  return {
+    ...defaults,
+    ...screenshot,
+    phoneConfigs,
+    selectedPhoneIndex: screenshot.selectedPhoneIndex ?? null,
+  };
+}
 
 export const useScreenshotStore = create<ScreenshotStore>()(
   persist(
@@ -191,6 +257,29 @@ export const useScreenshotStore = create<ScreenshotStore>()(
         set(state => ({
           screenshots: state.screenshots.map(screenshot =>
             screenshot.id === id ? { ...screenshot, ...updates } : screenshot
+          ),
+        }));
+      },
+
+      updatePhoneConfig: (screenshotId: string, phoneIndex: number, updates: Partial<PhoneConfig>) => {
+        set(state => ({
+          screenshots: state.screenshots.map(screenshot => {
+            if (screenshot.id !== screenshotId) return screenshot;
+            const newPhoneConfigs = [...screenshot.phoneConfigs];
+            if (phoneIndex >= 0 && phoneIndex < newPhoneConfigs.length) {
+              newPhoneConfigs[phoneIndex] = { ...newPhoneConfigs[phoneIndex], ...updates };
+            }
+            return { ...screenshot, phoneConfigs: newPhoneConfigs };
+          }),
+        }));
+      },
+
+      selectPhone: (screenshotId: string, phoneIndex: number | null) => {
+        set(state => ({
+          screenshots: state.screenshots.map(screenshot =>
+            screenshot.id === screenshotId
+              ? { ...screenshot, selectedPhoneIndex: phoneIndex }
+              : screenshot
           ),
         }));
       },
@@ -263,10 +352,24 @@ export const useScreenshotStore = create<ScreenshotStore>()(
     }),
     {
       name: STORAGE_KEY,
+      version: 1,
       partialize: (state) => ({
         screenshots: state.screenshots,
         selectedId: state.selectedId,
       }),
+      migrate: (persistedState: unknown, version: number) => {
+        const state = persistedState as { screenshots: Screenshot[]; selectedId: string | null };
+        if (version < 1) {
+          return {
+            ...state,
+            screenshots: state.screenshots.map(migrateScreenshot),
+          };
+        }
+        return {
+          ...state,
+          screenshots: state.screenshots.map(migrateScreenshot),
+        };
+      },
     }
   )
 );

@@ -5,3 +5,5 @@ export * from './Decorations';
 export * from './TextOverlay';
 export * from './FeaturePills';
 export * from './StatsBadges';
+export * from './PhoneToolbar';
+export * from './PhoneControlBar';

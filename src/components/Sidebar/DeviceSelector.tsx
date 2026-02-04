@@ -1,4 +1,4 @@
-import { deviceFrames, DeviceFrame } from '../../data/deviceFrames';
+import { deviceFrames, getDeviceById } from '../../data/deviceFrames';
 
 interface DeviceSelectorProps {
   selectedDevice: string;
@@ -6,28 +6,30 @@ interface DeviceSelectorProps {
   disabled?: boolean;
 }
 
-function DeviceIcon({ device, isSelected }: { device: DeviceFrame; isSelected: boolean }) {
-  const baseColor = isSelected ? 'border-blue-500' : 'border-gray-500';
-  const bgColor = isSelected ? 'bg-blue-500/20' : 'bg-gray-700';
-  
-  return (
-    <div className={`relative w-5 h-8 rounded-md border-2 ${baseColor} ${bgColor} flex items-center justify-center`}>
-      {device.notchType === 'dynamic-island' && (
-        <div className="absolute top-1 w-2 h-0.5 rounded-full bg-current opacity-60" />
-      )}
-      {device.notchType === 'notch' && (
-        <div className="absolute top-0 w-2.5 h-1 rounded-b bg-current opacity-60" />
-      )}
-      {device.notchType === 'punch-hole' && (
-        <div className="absolute top-0.5 w-1 h-1 rounded-full bg-current opacity-60" />
-      )}
-    </div>
-  );
-}
+// Group devices by manufacturer/series for better organization
+const deviceGroups = {
+  ios: [
+    { label: 'iPhone 16 Series', ids: ['iphone-16-pro-max', 'iphone-16-pro', 'iphone-16'] },
+    { label: 'iPhone 15 Series', ids: ['iphone-15-pro-max', 'iphone-15-pro', 'iphone-15'] },
+    { label: 'iPhone 14 Series', ids: ['iphone-14-pro-max', 'iphone-14-pro', 'iphone-14'] },
+    { label: 'iPhone 13 Series', ids: ['iphone-13-pro-max', 'iphone-13', 'iphone-13-mini'] },
+    { label: 'iPhone SE', ids: ['iphone-se'] },
+  ],
+  android: [
+    { label: 'Samsung S24', ids: ['samsung-s24-ultra', 'samsung-s24-plus', 'samsung-s24'] },
+    { label: 'Samsung S23', ids: ['samsung-s23-ultra', 'samsung-s23'] },
+    { label: 'Samsung A Series', ids: ['samsung-a54'] },
+    { label: 'Pixel 9', ids: ['pixel-9-pro-xl', 'pixel-9-pro', 'pixel-9'] },
+    { label: 'Pixel 8', ids: ['pixel-8-pro', 'pixel-8'] },
+    { label: 'OnePlus', ids: ['oneplus-12', 'oneplus-11'] },
+    { label: 'Xiaomi', ids: ['xiaomi-14-ultra', 'xiaomi-14'] },
+    { label: 'Other', ids: ['generic-android', 'no-frame'] },
+  ],
+};
 
 export function DeviceSelector({ selectedDevice, onChange, disabled }: DeviceSelectorProps) {
-  const iosDevices = deviceFrames.filter(d => d.type === 'ios');
-  const androidDevices = deviceFrames.filter(d => d.type === 'android');
+  const selectedDeviceInfo = getDeviceById(selectedDevice);
+  const isIOS = selectedDeviceInfo?.type === 'ios';
 
   return (
     <div>
@@ -35,53 +37,70 @@ export function DeviceSelector({ selectedDevice, onChange, disabled }: DeviceSel
         Device Frame
       </h3>
       
-      <div className="space-y-4">
-        <div>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">iOS</span>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {iosDevices.map(device => {
-              const isSelected = selectedDevice === device.id;
-              return (
-                <button
-                  key={device.id}
-                  onClick={() => onChange(device.id)}
-                  disabled={disabled}
-                  className={`p-2 rounded-lg text-xs font-medium text-left transition-colors flex items-center gap-2 ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <DeviceIcon device={device} isSelected={isSelected} />
-                  <span className="truncate">{device.name}</span>
-                </button>
-              );
-            })}
+      <div className="space-y-3">
+        {/* Current selection display */}
+        <div className="flex items-center gap-2 p-2 bg-gray-800 rounded-lg">
+          <div className="relative w-6 h-10 rounded-md border-2 border-blue-500 bg-blue-500/20 flex items-center justify-center">
+            {selectedDeviceInfo?.notchType === 'dynamic-island' && (
+              <div className="absolute top-1 w-2.5 h-0.5 rounded-full bg-blue-400" />
+            )}
+            {selectedDeviceInfo?.notchType === 'notch' && (
+              <div className="absolute top-0 w-3 h-1 rounded-b bg-blue-400" />
+            )}
+            {selectedDeviceInfo?.notchType === 'punch-hole' && (
+              <div className="absolute top-0.5 w-1.5 h-1.5 rounded-full bg-blue-400" />
+            )}
+          </div>
+          <div>
+            <div className="text-sm font-medium text-white">{selectedDeviceInfo?.name || 'Select Device'}</div>
+            <div className="text-[10px] text-gray-500 uppercase">{selectedDeviceInfo?.type || ''}</div>
           </div>
         </div>
 
+        {/* iOS Dropdown */}
         <div>
-          <span className="text-[10px] text-gray-500 uppercase tracking-wider">Android</span>
-          <div className="grid grid-cols-2 gap-2 mt-2">
-            {androidDevices.map(device => {
-              const isSelected = selectedDevice === device.id;
-              return (
-                <button
-                  key={device.id}
-                  onClick={() => onChange(device.id)}
-                  disabled={disabled}
-                  className={`p-2 rounded-lg text-xs font-medium text-left transition-colors flex items-center gap-2 ${
-                    isSelected
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                  } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  <DeviceIcon device={device} isSelected={isSelected} />
-                  <span className="truncate">{device.name}</span>
-                </button>
-              );
-            })}
-          </div>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">iOS Devices</label>
+          <select
+            value={isIOS ? selectedDevice : ''}
+            onChange={(e) => e.target.value && onChange(e.target.value)}
+            disabled={disabled}
+            className={`w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <option value="">Select iOS device...</option>
+            {deviceGroups.ios.map(group => (
+              <optgroup key={group.label} label={group.label}>
+                {group.ids.map(id => {
+                  const device = deviceFrames.find(d => d.id === id);
+                  return device ? (
+                    <option key={id} value={id}>{device.name}</option>
+                  ) : null;
+                })}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+
+        {/* Android Dropdown */}
+        <div>
+          <label className="text-[10px] text-gray-500 uppercase tracking-wider block mb-1.5">Android Devices</label>
+          <select
+            value={!isIOS ? selectedDevice : ''}
+            onChange={(e) => e.target.value && onChange(e.target.value)}
+            disabled={disabled}
+            className={`w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500 ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <option value="">Select Android device...</option>
+            {deviceGroups.android.map(group => (
+              <optgroup key={group.label} label={group.label}>
+                {group.ids.map(id => {
+                  const device = deviceFrames.find(d => d.id === id);
+                  return device ? (
+                    <option key={id} value={id}>{device.name}</option>
+                  ) : null;
+                })}
+              </optgroup>
+            ))}
+          </select>
         </div>
       </div>
     </div>

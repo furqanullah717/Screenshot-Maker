@@ -14,10 +14,12 @@ interface ScreenshotCardProps {
   height?: number;
   secondImage?: string | null;
   pairedVariant?: 'left' | 'right';
+  selectedPhoneIndex?: number | null;
+  onPhoneSelect?: (phoneIndex: number | null) => void;
 }
 
 export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
-  ({ screenshot, width = 400, height = 800, secondImage, pairedVariant }, ref) => {
+  ({ screenshot, width = 400, height = 800, secondImage, pairedVariant, selectedPhoneIndex, onPhoneSelect }, ref) => {
     const baseLayout = getLayoutById(screenshot.layout);
     
     if (!baseLayout) {
@@ -36,16 +38,25 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
       : baseLayout;
 
     // Get user transform overrides
-    const phoneTransform = screenshot.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 };
     const textTransform = screenshot.textTransform ?? { x: 0, y: 0, scale: 1 };
 
-    const phoneScale = layout.phonePosition.scale * 0.8 * phoneTransform.scale;
+    const phoneConfigs = screenshot.phoneConfigs || [];
+    const primaryPhone = phoneConfigs[0];
+    const secondaryPhone = phoneConfigs[1];
 
-    const getPhoneStyle = (position: PhonePosition): React.CSSProperties => {
+    // Get individual phone transforms
+    const primaryPhoneTransform = primaryPhone?.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 };
+    const secondaryPhoneTransform = secondaryPhone?.phoneTransform ?? { x: 0, y: 0, scale: 1, rotation: 0 };
+
+    const getPrimaryPhoneScale = () => layout.phonePosition.scale * 0.8 * primaryPhoneTransform.scale;
+    const getSecondaryPhoneScale = () => (layout.secondPhonePosition?.scale ?? layout.phonePosition.scale) * 0.8 * secondaryPhoneTransform.scale;
+
+    const getPhoneStyle = (position: PhonePosition, phoneIndex: number): React.CSSProperties => {
+      const transform = phoneIndex === 0 ? primaryPhoneTransform : secondaryPhoneTransform;
       const baseRotation = position.rotation || 0;
-      const finalRotation = baseRotation + phoneTransform.rotation;
-      const finalX = position.x + phoneTransform.x;
-      const finalY = position.y + phoneTransform.y;
+      const finalRotation = baseRotation + transform.rotation;
+      const finalX = position.x + transform.x;
+      const finalY = position.y + transform.y;
       
       return {
         position: 'absolute',
@@ -83,6 +94,12 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
       return false;
     };
 
+    const handlePhoneClick = (phoneIndex: number) => {
+      if (onPhoneSelect) {
+        onPhoneSelect(phoneIndex);
+      }
+    };
+
     const showFeaturePills = layout.showFeaturePills && 
       layout.featurePillPositions && 
       featurePills.length > 0 &&
@@ -118,22 +135,28 @@ export const ScreenshotCard = forwardRef<HTMLDivElement, ScreenshotCardProps>(
           transform={textTransform}
         />
         
-        <div style={getPhoneStyle(layout.phonePosition)}>
+        <div style={getPhoneStyle(layout.phonePosition, 0)} className="relative">
           <DeviceFrame
-            deviceId={screenshot.deviceFrame}
-            screenshot={screenshot.image}
-            imageTransform={screenshot.imageTransform}
-            scale={phoneScale}
+            deviceId={primaryPhone?.deviceFrame || screenshot.deviceFrame}
+            screenshot={primaryPhone?.image ?? screenshot.image}
+            imageTransform={primaryPhone?.imageTransform || screenshot.imageTransform}
+            scale={getPrimaryPhoneScale()}
+            isSelected={selectedPhoneIndex === 0}
+            phoneIndex={0}
+            onClick={onPhoneSelect ? handlePhoneClick : undefined}
           />
         </div>
         
         {layout.phoneCount === 2 && layout.secondPhonePosition && (
-          <div style={getPhoneStyle(layout.secondPhonePosition)}>
+          <div style={getPhoneStyle(layout.secondPhonePosition, 1)} className="relative">
             <DeviceFrame
-              deviceId={screenshot.deviceFrame}
-              screenshot={secondImage || screenshot.image}
-              imageTransform={screenshot.imageTransform}
-              scale={phoneScale}
+              deviceId={secondaryPhone?.deviceFrame || screenshot.deviceFrame}
+              screenshot={secondaryPhone?.image ?? secondImage ?? screenshot.image}
+              imageTransform={secondaryPhone?.imageTransform || screenshot.imageTransform}
+              scale={getSecondaryPhoneScale()}
+              isSelected={selectedPhoneIndex === 1}
+              phoneIndex={1}
+              onClick={onPhoneSelect ? handlePhoneClick : undefined}
             />
           </div>
         )}
