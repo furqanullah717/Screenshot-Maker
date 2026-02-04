@@ -239,40 +239,6 @@ export function DeviceFrame({
           </div>
         )}
 
-        {/* Status Bar (subtle overlay for realism) */}
-        {!isNoFrame && !isIPhoneSE && (
-          <div
-            className="absolute top-0 left-0 right-0 flex items-center justify-between px-6 pt-3 z-10"
-            style={{ height: '44px' }}
-          >
-            <span className="text-white text-xs font-medium opacity-80">9:41</span>
-            <div className="flex items-center gap-1 opacity-80">
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9 9-4.03 9-9-4.03-9-9-9z" opacity="0" />
-                <path d="M2 9h3v12H2V9zm5-4h3v16H7V5zm5-3h3v19h-3V2zm5 6h3v13h-3V8z" />
-              </svg>
-              <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z" />
-              </svg>
-              <svg className="w-6 h-4 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <rect x="2" y="7" width="18" height="10" rx="2" ry="2" stroke="currentColor" strokeWidth="1" fill="none" />
-                <rect x="4" y="9" width="12" height="6" rx="1" fill="currentColor" />
-                <path d="M22 10v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-            </div>
-          </div>
-        )}
-
-        {/* Home Indicator (for notch/dynamic island devices) */}
-        {(device.notchType === 'notch' || device.notchType === 'dynamic-island') && (
-          <div
-            className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-white rounded-full opacity-60 z-10"
-            style={{
-              width: '134px',
-              height: '5px',
-            }}
-          />
-        )}
       </div>
 
       {/* Home Button for iPhone SE */}
