@@ -97,6 +97,18 @@ function App() {
     }
   };
 
+  // Update device frame for all phones when global device is changed
+  const handleGlobalDeviceChange = (deviceFrame: string) => {
+    if (selectedId && selectedScreenshot) {
+      // Update the global deviceFrame
+      updateScreenshot(selectedId, { deviceFrame });
+      // Also update all phoneConfigs to use the new device
+      selectedScreenshot.phoneConfigs.forEach((_, index) => {
+        updatePhoneConfig(selectedId, index, { deviceFrame });
+      });
+    }
+  };
+
   const handleCanvasClick = () => {
     if (selectedId && selectedScreenshot?.selectedPhoneIndex !== null) {
       selectPhone(selectedId, null);
@@ -218,8 +230,8 @@ function App() {
                   />
                 ) : (
                   <DeviceSelector
-                    selectedDevice={selectedScreenshot.deviceFrame}
-                    onChange={(deviceFrame) => updateScreenshot(selectedId!, { deviceFrame })}
+                    selectedDevice={selectedScreenshot.phoneConfigs[0]?.deviceFrame || selectedScreenshot.deviceFrame}
+                    onChange={handleGlobalDeviceChange}
                   />
                 )}
 
